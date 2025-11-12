@@ -1,0 +1,23 @@
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: serviceC-destination-rule
+  namespace: default
+spec:
+  host: serviceC.default.svc.cluster.local
+  trafficPolicy:
+    loadBalancer:
+      simple: ROUND_ROBIN
+    connectionPool:
+      tcp:
+        maxConnections: 100
+      http:
+        http1MaxPendingRequests: 50
+        http2MaxRequests: 100
+  subsets:
+    - name: v1.0
+      labels:
+        version: v1.0
+    - name: v2.0
+      labels:
+        version: v2.0

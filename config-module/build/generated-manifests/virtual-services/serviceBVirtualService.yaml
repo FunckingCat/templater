@@ -1,0 +1,23 @@
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: serviceB-virtual-service
+  namespace: default
+spec:
+  hosts:
+    - serviceB.default.svc.cluster.local
+  http:
+    - match:
+        - headers:
+            x-version:
+              exact: canary
+      route:
+        - destination:
+            host: serviceB.default.svc.cluster.local
+            subset: canary
+          weight: 100
+    - route:
+        - destination:
+            host: serviceB.default.svc.cluster.local
+            subset: stable
+          weight: 100

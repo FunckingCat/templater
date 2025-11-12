@@ -2,13 +2,17 @@
 
 A Gradle convention plugin for processing templates with placeholders in multi-project builds. This plugin allows you to create multiple manifest files from templates by replacing placeholders with configured values.
 
+Built on top of Gradle's native `Copy` task with `expand()` functionality for idiomatic and efficient template processing.
+
 ## Features
 
+- **Gradle Copy Task**: Leverages Gradle's built-in `Copy` task with `expand()` for template processing
 - **Typed Configuration**: Strongly-typed, extensible configuration DSL
 - **Multiple Templates**: Support for processing multiple different templates in a single submodule
-- **Flexible Placeholders**: Replace placeholders in format `@name@` with configured values
+- **Flexible Placeholders**: Replace placeholders in format `${variable}` with configured values (standard Gradle syntax)
 - **Automatic File Generation**: Generate separate files for each configuration from a single template
 - **Gradle Integration**: Integrates seamlessly with the standard `processResources` task
+- **Incremental Builds**: Full support for Gradle's incremental build and up-to-date checks
 
 ## Project Structure
 
@@ -92,40 +96,47 @@ templateProcessing {
 
 ### 3. Create Templates
 
-Create your templates in `src/main/resources` with placeholders in `@name@` format:
+Create your templates in `src/main/resources` with placeholders in `${variable}` format (standard Gradle syntax):
 
 **Example: DestinationRuleTemplate.yaml**
 ```yaml
 apiVersion: networking.istio.io/v1beta1
 kind: DestinationRule
 metadata:
-  name: @name@-destination-rule
+  name: ${name}-destination-rule
   namespace: default
 spec:
-  host: @name@.default.svc.cluster.local
+  host: ${name}.default.svc.cluster.local
   subsets:
-    - name: @from@
+    - name: ${from}
       labels:
-        version: @from@
-    - name: @to@
+        version: ${from}
+    - name: ${to}
       labels:
-        version: @to@
+        version: ${to}
 ```
 
 ### 4. Run the Tasks
 
-The plugin automatically creates tasks for each template configuration:
+The plugin automatically creates tasks for each template configuration and replacement:
 
 ```bash
 # List available template processing tasks
 gradle tasks --group="template processing"
 
-# Run specific template processing task
+# Run specific template processing task (aggregate task)
 gradle processDestinationRuleTemplate
+
+# Run individual replacement task
+gradle processDestinationRuleTemplateServiceA
 
 # Run all template processing tasks
 gradle processResources
 ```
+
+**Generated Tasks:**
+- Aggregate tasks: `process{TemplateName}Template` - coordinates all replacements for a template
+- Individual tasks: `process{TemplateName}Template{ReplacementName}` - processes a single replacement
 
 ## Configuration Reference
 
@@ -192,14 +203,20 @@ find config-module/build/generated-manifests -name "*.yaml"
 
 1. Plugin applies to the project and ensures Java plugin is present
 2. Creates a `templateProcessing` extension for configuration
-3. For each template configuration, registers a task named `process{TemplateName}Template`
-4. Tasks are configured to depend on `processResources`
-5. When executed, each task:
+3. For each template configuration and replacement:
+   - Creates a Gradle `Copy` task (e.g., `processDestinationRuleTemplateServiceA`)
+   - Configures the Copy task with:
+     - Source: the template file from resources
+     - Filter: `expand()` with placeholder values
+     - Rename: output filename based on the pattern
+     - Destination: the configured output directory
+4. Creates an aggregate task (e.g., `processDestinationRuleTemplate`) that depends on all Copy tasks for that template
+5. Aggregate tasks depend on `processResources`
+6. When executed, Gradle's Copy task:
    - Reads the template file
-   - For each replacement configuration:
-     - Replaces `@name@` with the replacement name
-     - Replaces all custom `@placeholder@` values
-     - Writes to a separate output file
+   - Replaces `${variable}` placeholders using `expand()` (Groovy SimpleTemplateEngine)
+   - Renames and writes to the output directory
+   - Supports incremental builds and up-to-date checks
 
 ## Extension Points
 
@@ -209,3 +226,16 @@ The plugin is designed to be extensible. You can:
 2. Integrate with other plugins or build processes
 3. Customize output file naming patterns
 4. Add validation or pre/post-processing hooks
+5. Leverage all Copy task features (filtering, permissions, etc.)
+
+## Benefits of Using Gradle's Copy Task
+
+This implementation leverages Gradle's built-in `Copy` task which provides:
+
+1. **Incremental Builds**: Gradle automatically tracks inputs/outputs and skips tasks when nothing changed
+2. **Build Cache Support**: Tasks can be cached and reused across builds
+3. **Standard Syntax**: Uses `${variable}` syntax familiar to Gradle users
+4. **Battle-Tested**: Relies on Gradle's well-tested Copy and expand functionality
+5. **Flexibility**: Can easily add other Copy task features (file permissions, filtering, etc.)
+6. **Performance**: Efficient file processing using Gradle's internal optimizations
+7. **Configuration Cache**: Compatible with Gradle's configuration cache
